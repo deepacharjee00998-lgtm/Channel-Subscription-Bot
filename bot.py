@@ -165,7 +165,9 @@ def approve_now(call):
         expiry_ts = int(expiry_datetime.timestamp())
 
         # Link expires when sub ends
-        link = bot.create_chat_invite_link(ch_id, member_limit=1, expire_date=expiry_ts)
+        link = bot.create_chat_invite_link(
+    ch_id, member_limit=1
+        )
         
         users_col.update_one({"user_id": u_id, "channel_id": ch_id}, {"$set": {"expiry": expiry_datetime.timestamp()}}, upsert=True)
         
