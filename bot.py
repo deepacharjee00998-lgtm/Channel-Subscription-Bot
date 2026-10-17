@@ -1,4 +1,4 @@
-import os
+ import os
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pymongo import MongoClient
@@ -147,8 +147,17 @@ def admin_notify(call):
     markup.add(InlineKeyboardButton("✅ Approve", callback_data=f"app_{user.id}_{ch_id}_{mins}"))
     markup.add(InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user.id}"))
     
-    bot.send_message(ADMIN_ID, f"🔔 *Payment Verification Required!*\n\nUser: {user.first_name}\nChannel: {ch_data['name']}\nPlan: {mins} Mins\nPrice: ₹{price}", 
-                     reply_markup=markup, parse_mode="Markdown")
+    # Use plain text here: user/channel names may contain Markdown characters
+    # such as underscores, which can trigger Telegram's "can't parse entities" error.
+    bot.send_message(
+        ADMIN_ID,
+        f"🔔 Payment Verification Required!\n\n"
+        f"User: {user.first_name}\n"
+        f"Channel: {ch_data['name']}\n"
+        f"Plan: {mins} Mins\n"
+        f"Price: ₹{price}",
+        reply_markup=markup
+    )
     
     u_markup = InlineKeyboardMarkup().add(InlineKeyboardButton("📞 Contact Admin", url=f"https://t.me/{CONTACT_USERNAME}"))
     bot.send_message(call.message.chat.id, "✅ Your payment request has been sent. Please wait for Admin approval.", reply_markup=u_markup)
@@ -165,9 +174,7 @@ def approve_now(call):
         expiry_ts = int(expiry_datetime.timestamp())
 
         # Link expires when sub ends
-        link = bot.create_chat_invite_link(
-    ch_id, member_limit=1
-        )
+        link = bot.create_chat_invite_link(ch_id, member_limit=1, expire_date=expiry_ts)
         
         users_col.update_one({"user_id": u_id, "channel_id": ch_id}, {"$set": {"expiry": expiry_datetime.timestamp()}}, upsert=True)
         
@@ -214,3 +221,4 @@ if __name__ == '__main__':
     bot.remove_webhook()
     print("Bot is running...")
     bot.infinity_polling(timeout=20, long_polling_timeout=10)
+        
