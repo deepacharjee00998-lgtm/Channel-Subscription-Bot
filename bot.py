@@ -1,4 +1,4 @@
- import os
+import os
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pymongo import MongoClient
