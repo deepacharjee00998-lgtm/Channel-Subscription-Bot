@@ -184,6 +184,24 @@ def approve_now(call):
     except Exception as e:
         bot.send_message(ADMIN_ID, f"❌ Error: {e}")
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('rej_'))
+def reject_payment(call):
+    u_id = int(call.data.split('_')[1])
+    bot.answer_callback_query(call.id, "Payment request rejected.")
+    try:
+        bot.send_message(
+            u_id,
+            "Kya yaar payment na karke bol rhe ho ki kardi sharam karo thoda 😔"
+        )
+        bot.edit_message_text(
+            f"❌ Rejected payment request from user {u_id}.",
+            call.message.chat.id,
+            call.message.message_id
+        )
+    except Exception as e:
+        bot.send_message(ADMIN_ID, f"❌ Rejection notification error for user {u_id}: {e}")
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('manage_'))
 def manage_ch(call):
     ch_id = int(call.data.split('_')[1])
