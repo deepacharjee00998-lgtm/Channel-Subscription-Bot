@@ -250,7 +250,7 @@ def admin_notify(call):
     request_id = f"{user.id}_{ch_id}_{mins}"
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("✅ Approve", callback_data=f"app_{user.id}_{ch_id}_{mins}"))
-    markup.add(InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user.id}"))
+    markup.add(InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user.id}_{ch_id}_{mins}"))
 
     coupon_line = f"\nCoupon: {checkout.get('coupon_code')} ({checkout.get('discount_percent', 0)}% OFF)" if checkout.get('coupon_code') else ""
     bot.send_message(
@@ -288,25 +288,80 @@ def approve_now(call):
         if checkout and checkout.get("coupon_code"):
             coupons_col.update_one({"code": checkout["coupon_code"], "channel_id": ch_id}, {"$inc": {"used_count": 1}})
         
-        bot.send_message(u_id, f"🥳 *Payment Approved!*\n\nSubscription: {mins} Minutes\n\nJoin Link: {link.invite_link}\n\n⚠️ Note: This link and your access will expire in {mins} minutes.", parse_mode="Markdown")
-        bot.edit_message_text(f"✅ Approved user {u_id} for {mins} mins.", call.message.chat.id, call.message.message_id)
+        # Show the user's Telegram name + username and purchased batch after approval.
+        try:
+            approved_user = bot.get_chat(u_id)
+            display_name = approved_user.first_name or "Unknown"
+            if approved_user.last_name:
+                display_name += f" {approved_user.last_name}"
+            username = f"@{approved_user.username}" if approved_user.username else "No username"
+        except Exception:
+            display_name = "Unknown"
+            username = "No username"
+
+        bot.send_message(
+            u_id,
+            f"🥳 *Payment Approved!*\n\n"
+            f"📚 *Batch:* {ch_data['name']}\n"
+            f"⏳ *Subscription:* {get_plan_label(mins)}\n\n"
+            f"🔗 *Join Link:* {link.invite_link}\n\n"
+            f"⚠️ *Note:* This link and your access will expire in {mins} minutes.",
+            parse_mode="Markdown"
+        )
+        bot.edit_message_text(
+            f"✅ *Payment Approved*\n\n"
+            f"👤 *User:* {display_name} ({username})\n"
+            f"🆔 *User ID:* {u_id}\n"
+            f"📚 *Batch:* {ch_data['name']}\n"
+            f"⏳ *Plan:* {get_plan_label(mins)}\n"
+            f"💰 *Amount:* ₹{float(checkout['final_price']):.2f}",
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode="Markdown"
+        )
         
     except Exception as e:
         bot.send_message(ADMIN_ID, f"❌ Error: {e}")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('rej_'))
 def reject_payment(call):
-    u_id = int(call.data.split('_')[1])
+    _, u_id, ch_id, mins = call.data.split('_')
+    u_id, ch_id, mins = int(u_id), int(ch_id), int(mins)
     bot.answer_callback_query(call.id, "Payment request rejected.")
     try:
+        ch_data = channels_col.find_one({"channel_id": ch_id})
+        checkout = checkouts_col.find_one({"user_id": u_id, "channel_id": ch_id, "plan": str(mins)})
+
+        try:
+            rejected_user = bot.get_chat(u_id)
+            display_name = rejected_user.first_name or "Unknown"
+            if rejected_user.last_name:
+                display_name += f" {rejected_user.last_name}"
+            username = f"@{rejected_user.username}" if rejected_user.username else "No username"
+        except Exception:
+            display_name = "Unknown"
+            username = "No username"
+
         bot.send_message(
             u_id,
-            "Kya yaar payment na karke bol rhe ho ki kardi sharam karo thoda 😔"
+            "❌ *Payment Rejected*\n\n"
+            "Aapka payment request approve nahi kiya gaya hai. "
+            "Agar aapne payment successfully kiya hai, to please payment details "
+            "check karke Admin se contact karein. 🙏\n\n"
+            f"📚 *Batch:* {ch_data['name'] if ch_data else 'Unknown'}\n"
+            f"⏳ *Plan:* {get_plan_label(mins)}",
+            parse_mode="Markdown"
         )
         bot.edit_message_text(
-            f"❌ Rejected payment request from user {u_id}.",
+            f"❌ *Payment Rejected*\n\n"
+            f"👤 *User:* {display_name} ({username})\n"
+            f"🆔 *User ID:* {u_id}\n"
+            f"📚 *Batch:* {ch_data['name'] if ch_data else 'Unknown'}\n"
+            f"⏳ *Plan:* {get_plan_label(mins)}"
+            + (f"\n💰 *Amount:* ₹{float(checkout['final_price']):.2f}" if checkout else ""),
             call.message.chat.id,
-            call.message.message_id
+            call.message.message_id,
+            parse_mode="Markdown"
         )
     except Exception as e:
         bot.send_message(ADMIN_ID, f"❌ Rejection notification error for user {u_id}: {e}")
