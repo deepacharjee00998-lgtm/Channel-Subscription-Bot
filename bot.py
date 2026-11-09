@@ -277,6 +277,9 @@ def approve_now(call):
     u_id, ch_id, mins = int(u_id), int(ch_id), int(mins)
     
     try:
+        ch_data = channels_col.find_one({"channel_id": ch_id})
+        if not ch_data:
+            raise ValueError("Batch/Channel not found")
         expiry_datetime = datetime.now() + timedelta(minutes=mins)
         expiry_ts = int(expiry_datetime.timestamp())
 
